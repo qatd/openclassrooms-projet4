@@ -1,0 +1,15 @@
+meta {
+  name: Get teacher by id
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/teacher/{{teacherId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}

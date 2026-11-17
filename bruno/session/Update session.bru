@@ -1,0 +1,21 @@
+meta {
+  name: Update session
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/session/{{sessionId}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Bruno test session (updated)"
+  }
+}
+
+assert {
+  res.status: eq 200
+}

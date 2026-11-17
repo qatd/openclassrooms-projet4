@@ -1,0 +1,15 @@
+meta {
+  name: Delete session
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/session/{{sessionId}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
