@@ -52,5 +52,10 @@ export interface SessionFormData {
   name: string;
   date: string;
   description: string;
-  teacherId: number;
+  teacherId: number | ''; // '' until a teacher is selected in the form
+}
+
+// Error body returned by the backend
+export interface ApiError {
+  message: string;
 }
