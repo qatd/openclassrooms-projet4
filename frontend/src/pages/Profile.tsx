@@ -12,7 +12,7 @@ function Profile() {
   const [promoteError, setPromoteError] = useState<any>('');
   const user = authService.getCurrentUser();
   const token = authService.getToken();
-  const isDev = (import.meta as any).env?.DEV === true;
+  const isDev = import.meta.env.DEV;
 
   useEffect(() => {
     if (user) {
