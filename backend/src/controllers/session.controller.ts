@@ -1,22 +1,19 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { HttpError } from '../errors/http-error';
+import { UserRepository } from '../repositories/user.repository';
+import { TeacherRepository } from '../repositories/teacher.repository';
+import { SessionRepository } from '../repositories/session.repository';
+import { ParticipationRepository } from '../repositories/participation.repository';
 
-const prisma = new PrismaClient();
+const userRepository = new UserRepository();
+const teacherRepository = new TeacherRepository();
+const sessionRepository = new SessionRepository();
+const participationRepository = new ParticipationRepository();
 
 export class SessionController {
   async getAll(req: AuthRequest, res: Response) {
-    const sessions = await prisma.session.findMany({
-      include: {
-        teacher: true,
-        participants: {
-          include: {
-            user: true,
-          },
-        },
-      },
-    });
+    const sessions = await sessionRepository.findAll();
 
     const response: any = sessions.map((session: any) => ({
       id: session.id,
@@ -49,17 +46,7 @@ export class SessionController {
       throw new HttpError(400, 'Invalid session ID');
     }
 
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-      include: {
-        teacher: true,
-        participants: {
-          include: {
-            user: true,
-          },
-        },
-      },
-    });
+    const session = await sessionRepository.findByIdWithDetails(sessionId);
 
     if (!session) {
       throw new HttpError(404, 'Session not found');
@@ -99,33 +86,28 @@ export class SessionController {
       throw new HttpError(400, 'Teacher ID is required');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-    });
+    // Always set by authMiddleware: this check lets TypeScript know it's a number
+    if (!req.userId) {
+      throw new HttpError(401, 'Unauthorized');
+    }
+
+    const user = await userRepository.findById(req.userId);
 
     if (!user || !user.admin) {
       throw new HttpError(403, 'Admin access required');
     }
 
-    const teacher = await prisma.teacher.findUnique({
-      where: { id: teacherId },
-    });
+    const teacher = await teacherRepository.findById(teacherId);
 
     if (!teacher) {
       throw new HttpError(404, 'Teacher not found');
     }
 
-    const session = await prisma.session.create({
-      data: {
-        name,
-        date: new Date(date),
-        description,
-        teacherId,
-      },
-      include: {
-        teacher: true,
-        participants: true,
-      },
+    const session = await sessionRepository.create({
+      name,
+      date: new Date(date),
+      description,
+      teacherId,
     });
 
     const response: any = {
@@ -160,17 +142,18 @@ export class SessionController {
       throw new HttpError(400, 'Invalid session ID');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-    });
+    // Always set by authMiddleware: this check lets TypeScript know it's a number
+    if (!req.userId) {
+      throw new HttpError(401, 'Unauthorized');
+    }
+
+    const user = await userRepository.findById(req.userId);
 
     if (!user || !user.admin) {
       throw new HttpError(403, 'Admin access required');
     }
 
-    const existingSession = await prisma.session.findUnique({
-      where: { id: sessionId },
-    });
+    const existingSession = await sessionRepository.findById(sessionId);
 
     if (!existingSession) {
       throw new HttpError(404, 'Session not found');
@@ -181,27 +164,14 @@ export class SessionController {
     if (date) updateData.date = new Date(date);
     if (description) updateData.description = description;
     if (teacherId) {
-      const teacher = await prisma.teacher.findUnique({
-        where: { id: teacherId },
-      });
+      const teacher = await teacherRepository.findById(teacherId);
       if (!teacher) {
         throw new HttpError(404, 'Teacher not found');
       }
       updateData.teacherId = teacherId;
     }
 
-    const session = await prisma.session.update({
-      where: { id: sessionId },
-      data: updateData,
-      include: {
-        teacher: true,
-        participants: {
-          include: {
-            user: true,
-          },
-        },
-      },
-    });
+    const session = await sessionRepository.update(sessionId, updateData);
 
     const response: any = {
       id: session.id,
@@ -234,25 +204,24 @@ export class SessionController {
       throw new HttpError(400, 'Invalid session ID');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-    });
+    // Always set by authMiddleware: this check lets TypeScript know it's a number
+    if (!req.userId) {
+      throw new HttpError(401, 'Unauthorized');
+    }
+
+    const user = await userRepository.findById(req.userId);
 
     if (!user || !user.admin) {
       throw new HttpError(403, 'Admin access required');
     }
 
-    const existingSession = await prisma.session.findUnique({
-      where: { id: sessionId },
-    });
+    const existingSession = await sessionRepository.findById(sessionId);
 
     if (!existingSession) {
       throw new HttpError(404, 'Session not found');
     }
 
-    await prisma.session.delete({
-      where: { id: sessionId },
-    });
+    await sessionRepository.delete(sessionId);
 
     return res.status(200).json({ message: 'Session deleted successfully' });
   }
@@ -277,41 +246,25 @@ export class SessionController {
       throw new HttpError(400, 'Invalid user ID');
     }
 
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-    });
+    const session = await sessionRepository.findById(sessionId);
 
     if (!session) {
       throw new HttpError(404, 'Session not found');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: participantUserId },
-    });
+    const user = await userRepository.findById(participantUserId);
 
     if (!user) {
       throw new HttpError(404, 'User not found');
     }
 
-    const existingParticipation = await prisma.sessionParticipation.findUnique({
-      where: {
-        sessionId_userId: {
-          sessionId,
-          userId: participantUserId,
-        },
-      },
-    });
+    const existingParticipation = await participationRepository.find(sessionId, participantUserId);
 
     if (existingParticipation) {
       throw new HttpError(400, 'User already participating in this session');
     }
 
-    await prisma.sessionParticipation.create({
-      data: {
-        sessionId,
-        userId: participantUserId,
-      },
-    });
+    await participationRepository.create(sessionId, participantUserId);
 
     return res.status(200).json({ message: 'Successfully joined the session' });
   }
@@ -336,27 +289,13 @@ export class SessionController {
       throw new HttpError(400, 'Invalid user ID');
     }
 
-    const participation = await prisma.sessionParticipation.findUnique({
-      where: {
-        sessionId_userId: {
-          sessionId,
-          userId: participantUserId,
-        },
-      },
-    });
+    const participation = await participationRepository.find(sessionId, participantUserId);
 
     if (!participation) {
       throw new HttpError(404, 'Participation not found');
     }
 
-    await prisma.sessionParticipation.delete({
-      where: {
-        sessionId_userId: {
-          sessionId,
-          userId: participantUserId,
-        },
-      },
-    });
+    await participationRepository.delete(sessionId, participantUserId);
 
     return res.status(200).json({ message: 'Successfully left the session' });
   }

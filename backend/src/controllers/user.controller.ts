@@ -1,9 +1,9 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { HttpError } from '../errors/http-error';
+import { UserRepository } from '../repositories/user.repository';
 
-const prisma = new PrismaClient();
+const userRepository = new UserRepository();
 
 export class UserController {
   async getById(req: AuthRequest, res: Response) {
@@ -19,9 +19,7 @@ export class UserController {
       throw new HttpError(400, 'Invalid user ID');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await userRepository.findById(userId);
 
     if (!user) {
       throw new HttpError(404, 'User not found');
@@ -57,17 +55,13 @@ export class UserController {
       throw new HttpError(403, 'You can only delete your own account');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await userRepository.findById(userId);
 
     if (!user) {
       throw new HttpError(404, 'User not found');
     }
 
-    await prisma.user.delete({
-      where: { id: userId },
-    });
+    await userRepository.delete(userId);
 
     return res.status(200).json({ message: 'User deleted successfully' });
   }
@@ -82,9 +76,7 @@ export class UserController {
       throw new HttpError(401, 'Unauthorized');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-    });
+    const user = await userRepository.findById(req.userId);
 
     if (!user) {
       throw new HttpError(404, 'User not found');
@@ -102,10 +94,7 @@ export class UserController {
       });
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: user.id },
-      data: { admin: true },
-    });
+    const updatedUser = await userRepository.update(user.id, { admin: true });
 
     return res.status(200).json({
       id: updatedUser.id,

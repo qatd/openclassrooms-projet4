@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { generateToken } from '../utils/jwt.util';
 import { HttpError } from '../errors/http-error';
+import { UserRepository } from '../repositories/user.repository';
 
-const prisma = new PrismaClient();
+const userRepository = new UserRepository();
 
 export class AuthController {
   async login(req: Request, res: Response) {
@@ -23,9 +23,7 @@ export class AuthController {
       throw new HttpError(400, 'Password must be a string');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await userRepository.findByEmail(email);
 
     if (!user) {
       throw new HttpError(401, 'Invalid credentials');
@@ -70,9 +68,7 @@ export class AuthController {
       throw new HttpError(400, 'Password must be at least 8 characters');
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+    const existingUser = await userRepository.findByEmail(email);
 
     if (existingUser) {
       throw new HttpError(400, 'Email already exists');
@@ -80,14 +76,12 @@ export class AuthController {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        firstName,
-        lastName,
-        admin: false,
-      },
+    const user = await userRepository.create({
+      email,
+      password: hashedPassword,
+      firstName,
+      lastName,
+      admin: false,
     });
 
     const token = generateToken(user.id);
