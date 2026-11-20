@@ -113,6 +113,7 @@ function SessionDetail(): JSX.Element {
     );
   }
 
+  const isAdmin = user?.admin === true;
   const isParticipating = user !== null && session.users.includes(user.id);
 
   return (
@@ -155,7 +156,7 @@ function SessionDetail(): JSX.Element {
           </div>
 
           <div className="flex space-x-4">
-            {user?.admin ? (
+            {isAdmin && (
               <>
                 <button
                   onClick={() => navigate(`/sessions/edit/${id}`)}
@@ -170,24 +171,24 @@ function SessionDetail(): JSX.Element {
                   Delete
                 </button>
               </>
-            ) : (
-              <>
-                {isParticipating ? (
-                  <button
-                    onClick={handleUnparticipate}
-                    className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700"
-                  >
-                    Leave Session
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleParticipate}
-                    className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
-                  >
-                    Join Session
-                  </button>
-                )}
-              </>
+            )}
+
+            {!isAdmin && isParticipating && (
+              <button
+                onClick={handleUnparticipate}
+                className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700"
+              >
+                Leave Session
+              </button>
+            )}
+
+            {!isAdmin && !isParticipating && (
+              <button
+                onClick={handleParticipate}
+                className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+              >
+                Join Session
+              </button>
             )}
 
             <button
