@@ -82,7 +82,8 @@ export class SessionService {
     await sessionRepository.delete(id);
   }
 
-  async participate(sessionId: number, userId: number) {
+  async participate(currentUserId: number | undefined, sessionId: number, userId: number) {
+    this.ensureSameUser(currentUserId, userId);
     await this.ensureSessionExists(sessionId);
 
     const user = await userRepository.findById(userId);
@@ -100,7 +101,9 @@ export class SessionService {
     await participationRepository.create(sessionId, userId);
   }
 
-  async unparticipate(sessionId: number, userId: number) {
+  async unparticipate(currentUserId: number | undefined, sessionId: number, userId: number) {
+    this.ensureSameUser(currentUserId, userId);
+
     const participation = await participationRepository.find(sessionId, userId);
 
     if (!participation) {
@@ -108,6 +111,13 @@ export class SessionService {
     }
 
     await participationRepository.delete(sessionId, userId);
+  }
+
+  // A user can only join or leave a session for themselves, not for someone else
+  private ensureSameUser(currentUserId: number | undefined, userId: number) {
+    if (currentUserId !== userId) {
+      throw new HttpError(403, 'You can only join or leave a session for yourself');
+    }
   }
 
   // Only admins can create, update or delete sessions
