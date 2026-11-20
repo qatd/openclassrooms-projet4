@@ -1,10 +1,8 @@
 import { Request, Response } from 'express';
-import * as bcrypt from 'bcrypt';
-import { generateToken } from '../utils/jwt.util';
 import { HttpError } from '../errors/http-error';
-import { UserRepository } from '../repositories/user.repository';
+import { AuthService } from '../services/auth.service';
 
-const userRepository = new UserRepository();
+const authService = new AuthService();
 
 export class AuthController {
   async login(req: Request, res: Response) {
@@ -23,28 +21,7 @@ export class AuthController {
       throw new HttpError(400, 'Password must be a string');
     }
 
-    const user = await userRepository.findByEmail(email);
-
-    if (!user) {
-      throw new HttpError(401, 'Invalid credentials');
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      throw new HttpError(401, 'Invalid credentials');
-    }
-
-    const token = generateToken(user.id);
-
-    const response: any = {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      admin: user.admin,
-      token,
-    };
+    const response = await authService.login(email, password);
 
     return res.status(200).json(response);
   }
@@ -68,32 +45,7 @@ export class AuthController {
       throw new HttpError(400, 'Password must be at least 8 characters');
     }
 
-    const existingUser = await userRepository.findByEmail(email);
-
-    if (existingUser) {
-      throw new HttpError(400, 'Email already exists');
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await userRepository.create({
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      admin: false,
-    });
-
-    const token = generateToken(user.id);
-
-    const response: any = {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      admin: user.admin,
-      token,
-    };
+    const response = await authService.register({ email, password, firstName, lastName });
 
     return res.status(201).json(response);
   }

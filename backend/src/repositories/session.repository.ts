@@ -7,6 +7,9 @@ const sessionDetails = {
   participants: { include: { user: true } },
 } satisfies Prisma.SessionInclude;
 
+// Type of a session loaded with these relations
+export type SessionWithDetails = Prisma.SessionGetPayload<{ include: typeof sessionDetails }>;
+
 // Data access for sessions: the only place that queries the `sessions` table
 export class SessionRepository {
   findAll() {
