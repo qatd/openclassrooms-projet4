@@ -1,4 +1,4 @@
-import { useState, useEffect, type JSX } from 'react';
+import { useState, useEffect, useCallback, type JSX } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { authService } from '../services/auth.service';
@@ -13,26 +13,33 @@ function SessionDetail(): JSX.Element {
   const user = authService.getCurrentUser();
   const token = authService.getToken();
 
-  useEffect(() => {
-    fetchSession();
-  }, [id]);
-
-  const fetchSession = async (): Promise<void> => {
+  // useCallback keeps the same function between renders (until id or token changes),
+  // so it can be a dependency of the effect below and be reused after join/leave
+  const fetchSession = useCallback(async (signal?: AbortSignal): Promise<void> => {
     try {
       setLoading(true);
       const response = await api.get<Session>(`/session/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal,
       });
       setSession(response.data);
     } catch (err) {
+      if (signal?.aborted) return; // request cancelled by the cleanup: not an error
       setError('Failed to load session details');
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  };
+  }, [id, token]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchSession(controller.signal);
+    // Cleanup: cancel the request if the component unmounts or the id changes
+    return () => controller.abort();
+  }, [fetchSession]);
 
   const handleParticipate = async (): Promise<void> => {
     if (!user) return;

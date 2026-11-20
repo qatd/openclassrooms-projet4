@@ -1,4 +1,4 @@
-import { useState, useEffect, type JSX } from 'react';
+import { useState, useEffect, useCallback, type JSX } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { authService } from '../services/auth.service';
@@ -11,26 +11,33 @@ function Sessions(): JSX.Element {
   const user = authService.getCurrentUser();
   const token = authService.getToken();
 
-  useEffect(() => {
-    fetchSessions();
-  }, []);
-
-  const fetchSessions = async (): Promise<void> => {
+  // useCallback keeps the same function between renders (until token changes),
+  // so it can be a dependency of the effect below and be reused after a delete
+  const fetchSessions = useCallback(async (signal?: AbortSignal): Promise<void> => {
     try {
       setLoading(true);
       const response = await api.get<Session[]>('/session', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal,
       });
       setSessions(response.data);
     } catch (err) {
+      if (signal?.aborted) return; // request cancelled by the cleanup: not an error
       setError('Failed to load sessions');
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchSessions(controller.signal);
+    // Cleanup: cancel the request if the component unmounts before it finishes
+    return () => controller.abort();
+  }, [fetchSessions]);
 
   const handleDelete = async (sessionId: number): Promise<void> => {
     if (!window.confirm('Are you sure you want to delete this session?')) {

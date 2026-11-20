@@ -29,44 +29,54 @@ function SessionForm(): JSX.Element {
   }, [user, navigate]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    // Both requests are only used here, so they are defined inside the effect
+    const fetchTeachers = async (): Promise<void> => {
+      try {
+        const response = await api.get<Teacher[]>('/teacher', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal,
+        });
+        setTeachers(response.data);
+      } catch (err) {
+        if (signal.aborted) return; // request cancelled by the cleanup: not an error
+        console.error('Failed to fetch teachers', err);
+      }
+    };
+
+    const fetchSession = async (): Promise<void> => {
+      try {
+        const response = await api.get<Session>(`/session/${id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal,
+        });
+        const session = response.data;
+        setFormData({
+          name: session.name,
+          date: new Date(session.date).toISOString().split('T')[0],
+          description: session.description,
+          teacherId: session.teacher.id,
+        });
+      } catch (err) {
+        if (signal.aborted) return; // request cancelled by the cleanup: not an error
+        setError('Failed to load session');
+        console.error(err);
+      }
+    };
+
     fetchTeachers();
     if (isEditMode) {
       fetchSession();
     }
-  }, [id]);
-
-  const fetchTeachers = async (): Promise<void> => {
-    try {
-      const response = await api.get<Teacher[]>('/teacher', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      setTeachers(response.data);
-    } catch (err) {
-      console.error('Failed to fetch teachers', err);
-    }
-  };
-
-  const fetchSession = async (): Promise<void> => {
-    try {
-      const response = await api.get<Session>(`/session/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const session = response.data;
-      setFormData({
-        name: session.name,
-        date: new Date(session.date).toISOString().split('T')[0],
-        description: session.description,
-        teacherId: session.teacher.id,
-      });
-    } catch (err) {
-      setError('Failed to load session');
-      console.error(err);
-    }
-  };
+    // Cleanup: cancel both requests if the component unmounts or the id changes
+    return () => controller.abort();
+  }, [id, isEditMode, token]);
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>

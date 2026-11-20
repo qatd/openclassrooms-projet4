@@ -12,33 +12,39 @@ function Profile(): JSX.Element {
   const [promoteLoading, setPromoteLoading] = useState(false);
   const [promoteError, setPromoteError] = useState('');
   const user = authService.getCurrentUser();
+  const userId = user?.id; // a number is stable between renders, unlike the user object
   const token = authService.getToken();
   const isDev = import.meta.env.DEV;
 
   useEffect(() => {
-    if (user) {
-      fetchUserInfo();
-    }
-  }, []);
+    if (!userId) return;
 
-  const fetchUserInfo = async (): Promise<void> => {
-    if (!user) return;
+    const controller = new AbortController();
 
-    try {
-      setLoading(true);
-      const response = await api.get<User>(`/user/${user.id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      setUserInfo(response.data);
-    } catch (err) {
-      setError('Failed to load user information');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Defined inside the effect since it's only used here: dependencies stay accurate
+    const fetchUserInfo = async (): Promise<void> => {
+      try {
+        setLoading(true);
+        const response = await api.get<User>(`/user/${userId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
+        setUserInfo(response.data);
+      } catch (err) {
+        if (controller.signal.aborted) return; // request cancelled by the cleanup: not an error
+        setError('Failed to load user information');
+        console.error(err);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
+
+    fetchUserInfo();
+    // Cleanup: cancel the request if the component unmounts before it finishes
+    return () => controller.abort();
+  }, [userId, token]);
 
   const handleDeleteAccount = async (): Promise<void> => {
     if (!user) return;
