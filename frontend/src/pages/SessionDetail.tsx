@@ -1,40 +1,49 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, type JSX } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { authService } from '../services/auth.service';
 import { Session } from '../types';
 
-function SessionDetail() {
+function SessionDetail(): JSX.Element {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [session, setSession] = useState<any>(null);
-  const [loading, setLoading] = useState<any>(true);
-  const [error, setError] = useState<any>('');
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const user = authService.getCurrentUser();
   const token = authService.getToken();
 
-  useEffect(() => {
-    fetchSession();
-  }, [id]);
-
-  const fetchSession = async (): Promise<any> => {
+  // useCallback keeps the same function between renders (until id or token changes),
+  // so it can be a dependency of the effect below and be reused after join/leave
+  const fetchSession = useCallback(async (signal?: AbortSignal): Promise<void> => {
     try {
       setLoading(true);
       const response = await api.get<Session>(`/session/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal,
       });
       setSession(response.data);
-    } catch (err: any) {
+    } catch (err) {
+      if (signal?.aborted) return; // request cancelled by the cleanup: not an error
       setError('Failed to load session details');
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  };
+  }, [id, token]);
 
-  const handleParticipate = async (): Promise<any> => {
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchSession(controller.signal);
+    // Cleanup: cancel the request if the component unmounts or the id changes
+    return () => controller.abort();
+  }, [fetchSession]);
+
+  const handleParticipate = async (): Promise<void> => {
+    if (!user) return;
+
     try {
       await api.post(
         `/session/${id}/participate/${user.id}`,
@@ -46,13 +55,15 @@ function SessionDetail() {
         }
       );
       fetchSession();
-    } catch (err: any) {
+    } catch (err) {
       alert('Failed to join session');
       console.error(err);
     }
   };
 
-  const handleUnparticipate = async (): Promise<any> => {
+  const handleUnparticipate = async (): Promise<void> => {
+    if (!user) return;
+
     try {
       await api.delete(`/session/${id}/participate/${user.id}`, {
         headers: {
@@ -60,13 +71,13 @@ function SessionDetail() {
         },
       });
       fetchSession();
-    } catch (err: any) {
+    } catch (err) {
       alert('Failed to leave session');
       console.error(err);
     }
   };
 
-  const handleDelete = async (): Promise<any> => {
+  const handleDelete = async (): Promise<void> => {
     if (!window.confirm('Are you sure you want to delete this session?')) {
       return;
     }
@@ -78,7 +89,7 @@ function SessionDetail() {
         },
       });
       navigate('/sessions');
-    } catch (err: any) {
+    } catch (err) {
       alert('Failed to delete session');
       console.error(err);
     }
@@ -102,7 +113,8 @@ function SessionDetail() {
     );
   }
 
-  const isParticipating = session.users.includes(user.id);
+  const isAdmin = user?.admin === true;
+  const isParticipating = user !== null && session.users.includes(user.id);
 
   return (
     <div className="min-h-screen bg-gray-100 py-8">
@@ -144,7 +156,7 @@ function SessionDetail() {
           </div>
 
           <div className="flex space-x-4">
-            {user.admin ? (
+            {isAdmin && (
               <>
                 <button
                   onClick={() => navigate(`/sessions/edit/${id}`)}
@@ -159,24 +171,24 @@ function SessionDetail() {
                   Delete
                 </button>
               </>
-            ) : (
-              <>
-                {isParticipating ? (
-                  <button
-                    onClick={handleUnparticipate}
-                    className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700"
-                  >
-                    Leave Session
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleParticipate}
-                    className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
-                  >
-                    Join Session
-                  </button>
-                )}
-              </>
+            )}
+
+            {!isAdmin && isParticipating && (
+              <button
+                onClick={handleUnparticipate}
+                className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700"
+              >
+                Leave Session
+              </button>
+            )}
+
+            {!isAdmin && !isParticipating && (
+              <button
+                onClick={handleParticipate}
+                className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+              >
+                Join Session
+              </button>
             )}
 
             <button
