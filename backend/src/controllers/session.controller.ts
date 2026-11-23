@@ -67,7 +67,7 @@ export class SessionController {
   async participate(req: AuthRequest, res: Response) {
     const { id, userId } = req.params as { id: string, userId: string };
 
-    await sessionService.participate(parseId(id, 'Session'), parseId(userId, 'User'));
+    await sessionService.participate(req.userId, parseId(id, 'Session'), parseId(userId, 'User'));
 
     return res.status(200).json({ message: 'Successfully joined the session' });
   }
@@ -75,7 +75,7 @@ export class SessionController {
   async unparticipate(req: AuthRequest, res: Response) {
     const { id, userId } = req.params as { id: string, userId: string };
 
-    await sessionService.unparticipate(parseId(id, 'Session'), parseId(userId, 'User'));
+    await sessionService.unparticipate(req.userId, parseId(id, 'Session'), parseId(userId, 'User'));
 
     return res.status(200).json({ message: 'Successfully left the session' });
   }

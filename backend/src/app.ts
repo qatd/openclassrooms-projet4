@@ -1,10 +1,9 @@
+// First import: loads backend/.env before any other module reads process.env
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import routes from './routes';
 import { errorMiddleware } from './middleware/error.middleware';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
