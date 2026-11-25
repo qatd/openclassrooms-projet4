@@ -18,7 +18,10 @@ export default defineConfig({
   test: {
     // Simulated browser (DOM, localStorage...) so React components can render in Node
     environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
+    // Lets React Testing Library register its automatic cleanup: each test starts from an empty DOM
+    globals: true,
+    // Node 25+ has its own localStorage, which hides the jsdom one and fails without a storage file: turn it off
+    execArgv: ['--no-experimental-webstorage'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
@@ -26,7 +29,6 @@ export default defineConfig({
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'src/**/*.test.{ts,tsx}',
-        'src/test/**',
         'src/main.tsx', // bootstrap only: mounts <App /> into index.html
         'src/types/**', // type definitions only, no runtime code
         'src/vite-env.d.ts',
